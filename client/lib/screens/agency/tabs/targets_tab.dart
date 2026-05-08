@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../core/app_colors.dart';
+import '../../../core/app_typography.dart';
 import '../widgets/agency_widgets.dart';
 
 const _kPurple = AppColors.primaryPurple;
-const _kText   = Color(0xFF1A1A2E);
-const _kSub    = Color(0xFF888899);
-const _kBorder = Color(0xFFEEEEF5);
+const _kText   = AppColors.textPrimary;
+const _kSub    = AppColors.textSecondary;
+const _kBorder = AppColors.border;
 
 enum _TargetType { invite, diamondEarning, activeHours, giftSending, rechargeVolume }
 enum _Tier { none, bronze, silver, gold, platinum }

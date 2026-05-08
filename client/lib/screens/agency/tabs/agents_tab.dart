@@ -1,15 +1,9 @@
-
 import 'package:flutter/material.dart';
 import '../../../core/app_colors.dart';
 import '../../../core/app_typography.dart';
 import '../../../services/agency_api.dart';
 import '../widgets/agency_widgets.dart';
 import 'tab_helpers.dart';
-
-const _kCyan   = Color(0xFF06B6D4);
-const _kText   = Color(0xFF1A1A2E);
-const _kSub    = Color(0xFF888899);
-const _kBorder = Color(0xFFEEEEF5);
 
 class AgentsTab extends StatefulWidget {
   const AgentsTab({super.key});
@@ -54,8 +48,9 @@ class _AgentsTabState extends State<AgentsTab> {
             : _error != null ? ErrorPane(message: _error!, onRetry: _load)
             : _rows.isEmpty ? const TabEmpty(label: 'No agents found')
             : RefreshIndicator(
-                onRefresh: _load, color: AppColors.primaryPurple,
-                backgroundColor: AppColors.background,
+                onRefresh: _load,
+                color: AppColors.primaryPurple,
+                backgroundColor: AppColors.surface,
                 child: ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _rows.length,
@@ -91,61 +86,69 @@ class _AgentCardState extends State<AgentCard> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(children: [
+        // ── Header row ────────────────────────────────────────────────
         InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           onTap: () => setState(() => _expanded = !_expanded),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(children: [
-              CircleAvatar(radius: 20,
-                  backgroundColor: _kCyan.withValues(alpha: 0.12),
-                  child: Text((d['username'] as String)[0].toUpperCase(),
-                      style: const TextStyle(color: _kCyan,
-                          fontWeight: FontWeight.bold))),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.cyan.withValues(alpha: 0.15),
+                child: Text(
+                  (d['username'] as String)[0].toUpperCase(),
+                  style: const TextStyle(
+                      color: AppColors.cyan,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(d['username'] as String, style: const TextStyle(
-                    color: _kText, fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(d['username'] as String,
+                    style: AppTypography.labelMedium),
+                const SizedBox(height: 2),
                 Text(d['email'] as String,
-                    style: const TextStyle(color: _kSub, fontSize: 11)),
+                    style: AppTypography.caption),
               ])),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 StatusBadge(d['status'] as String),
                 const SizedBox(height: 4),
                 Text('$comm% comm.',
-                    style: const TextStyle(color: _kSub, fontSize: 10)),
+                    style: AppTypography.caption),
               ]),
               const SizedBox(width: 8),
-              Icon(_expanded ? Icons.expand_less : Icons.expand_more,
-                  color: AppColors.textHint, size: 20),
+              Icon(
+                _expanded ? Icons.expand_less : Icons.expand_more,
+                color: AppColors.textHint, size: 20,
+              ),
             ]),
           ),
         ),
+
+        // ── Quick stats ───────────────────────────────────────────────
         QuickStatsRow(items: [
-          QuickStatItem('Invites', '${d['total_invites']}', _kCyan),
-          QuickStatItem('Active', '${d['active_invites']}', Colors.green),
-          QuickStatItem('Monthly', '🪙${monthly.toStringAsFixed(0)}',
-              AppColors.gold),
-          QuickStatItem('Weekly', '🪙${weekly.toStringAsFixed(0)}',
-              AppColors.primaryPurple),
+          QuickStatItem('Invites',  '${d['total_invites']}',          AppColors.cyan),
+          QuickStatItem('Active',   '${d['active_invites']}',         AppColors.green),
+          QuickStatItem('Monthly',  '🪙${monthly.toStringAsFixed(0)}', AppColors.gold),
+          QuickStatItem('Weekly',   '🪙${weekly.toStringAsFixed(0)}',  AppColors.primaryPurple),
         ]),
+
+        // ── Expanded: targets ─────────────────────────────────────────
         if (_expanded && targets.isNotEmpty) ...[
           Container(height: 1, color: AppColors.border),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
             child: Row(children: [
-              const Text('🎯 Targets', style: TextStyle(
-                  color: _kText, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('🎯 Targets', style: AppTypography.h3),
               const Spacer(),
-              Text(widget.period,
-                  style: const TextStyle(color: _kSub, fontSize: 11)),
+              Text(widget.period, style: AppTypography.caption),
             ]),
           ),
           Padding(
@@ -155,22 +158,27 @@ class _AgentCardState extends State<AgentCard> {
               current:  (t['current'] as num).toDouble(),
               goal:     (t['goal'] as num).toDouble(),
               progress: (t['progress'] as num).toInt(),
-              color:    _kCyan,
+              color:    AppColors.cyan,
             )).toList()),
           ),
         ],
+
+        // ── Expanded: invite code ─────────────────────────────────────
         if (_expanded) ...[
           Container(height: 1, color: AppColors.border),
           Padding(
             padding: const EdgeInsets.all(14),
             child: Row(children: [
-              const Icon(Icons.link_rounded, color: Color(0xFFCCCCDD), size: 16),
+              Icon(Icons.link_rounded, color: AppColors.textHint, size: 16),
               const SizedBox(width: 8),
-              const Text('Invite code: ',
-                  style: TextStyle(color: _kSub, fontSize: 12)),
-              Text(d['invite_code'] as String, style: const TextStyle(
-                  color: _kText, fontWeight: FontWeight.bold,
-                  fontSize: 13, letterSpacing: 2)),
+              Text('Invite code: ', style: AppTypography.caption),
+              Text(
+                d['invite_code'] as String,
+                style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2),
+              ),
             ]),
           ),
         ],

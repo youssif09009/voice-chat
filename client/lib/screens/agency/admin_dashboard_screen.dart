@@ -41,6 +41,7 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _mgmtTabs;
+  Map<String, dynamic>? _analytics;
 
   static const _mgmtLabels = [
     '🏠 Overview', '📋 Apply', '🤝 Agents',
@@ -52,6 +53,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     super.initState();
     _mgmtTabs = TabController(length: 7, vsync: this);
     _mgmtTabs.addListener(() => setState(() {}));
+    _loadAnalytics();
+  }
+
+  Future<void> _loadAnalytics() async {
+    final r = await AgencyApi.instance.getAnalytics();
+    if (!mounted) return;
+    if (r.ok) setState(() => _analytics = r.data);
   }
 
   @override
@@ -71,11 +79,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         backgroundColor: AppColors.background,
         body: NestedScrollView(
           headerSliverBuilder: (ctx, _) => [
-            // ── Cover + profile card ──────────────────────────────────
             SliverToBoxAdapter(
               child: _ProfileHeader(
                 username: username,
                 initial: initial,
+                analytics: _analytics,
                 onPayment:   () => _push(ctx, const PaymentScreen()),
                 onSubAgency: () => _push(ctx, const SubAgencyScreen()),
                 onLogout: () {
@@ -85,7 +93,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 },
               ),
             ),
-            // ── Feature cards row ─────────────────────────────────────
             SliverToBoxAdapter(
               child: _FeatureRow(
                 onAgency:       () => _push(ctx, const AgencyMainScreen()),
@@ -95,9 +102,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 onCreateAgency: () => _push(ctx, const CreateAgencyScreen()),
               ),
             ),
-            // ── Section divider ───────────────────────────────────────
             const SliverToBoxAdapter(child: _SectionDivider(label: 'Management')),
-            // ── Sticky pill tab bar ───────────────────────────────────
             SliverPersistentHeader(
               pinned: true,
               delegate: _PillTabDelegate(
@@ -133,11 +138,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
 class _ProfileHeader extends StatelessWidget {
   final String username, initial;
+  final Map<String, dynamic>? analytics;
   final VoidCallback onPayment, onSubAgency, onLogout;
 
   const _ProfileHeader({
     required this.username,
     required this.initial,
+    required this.analytics,
     required this.onPayment,
     required this.onSubAgency,
     required this.onLogout,
@@ -149,7 +156,6 @@ class _ProfileHeader extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         _CoverArt(),
-        // Top action row
         Positioned(
           top: MediaQuery.of(context).padding.top + 8,
           left: 16, right: 16,
@@ -171,11 +177,15 @@ class _ProfileHeader extends StatelessWidget {
             _CoverBtn(icon: Icons.logout_rounded,    color: Colors.white54, onTap: onLogout),
           ]),
         ),
-        // Profile card overlapping cover
         Padding(
           padding: const EdgeInsets.only(top: 108),
-          child: _ProfileCard(username: username, initial: initial,
-              onPayment: onPayment, onSubAgency: onSubAgency),
+          child: _ProfileCard(
+            username: username,
+            initial: initial,
+            analytics: analytics,
+            onPayment: onPayment,
+            onSubAgency: onSubAgency,
+          ),
         ),
       ],
     );
@@ -280,14 +290,29 @@ class _Chip extends StatelessWidget {
 
 class _ProfileCard extends StatelessWidget {
   final String username, initial;
+  final Map<String, dynamic>? analytics;
   final VoidCallback onPayment, onSubAgency;
   const _ProfileCard({
     required this.username, required this.initial,
+    required this.analytics,
     required this.onPayment, required this.onSubAgency,
   });
 
+  String _fmt(dynamic v) {
+    if (v == null) return '—';
+    final n = (v as num).toInt();
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000)    return '${(n / 1000).toStringAsFixed(0)}K';
+    return '$n';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final users   = analytics?['users']   as Map<String, dynamic>?;
+    final agents  = analytics?['agents']  as Map<String, dynamic>?;
+    final hosts   = analytics?['hosts']   as Map<String, dynamic>?;
+    final gifts   = analytics?['gifts']   as Map<String, dynamic>?;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -297,11 +322,10 @@ class _ProfileCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Column(children: [
-        // Avatar + name row
+        // ── Avatar + name ─────────────────────────────────────────────
         Transform.translate(
           offset: const Offset(0, -28),
           child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            // Avatar
             Container(
               width: 72, height: 72,
               decoration: BoxDecoration(
@@ -329,37 +353,37 @@ class _ProfileCard extends StatelessWidget {
                   Text(username, style: AppTypography.h1),
                   const SizedBox(height: 5),
                   Row(children: [
-                    _Badge('👑 Admin',
-                        gradient: const [_kPurple, _kPink]),
+                    _Badge('👑 Admin', gradient: const [_kPurple, _kPink]),
                     const SizedBox(width: 6),
-                    _Badge('● Online',
-                        color: Colors.greenAccent,
-                        border: true),
+                    _Badge('● Online', color: AppColors.green, border: true),
                   ]),
                 ]),
               ),
             ),
           ]),
         ),
-        // Stats row
+
+        // ── Live stats row ────────────────────────────────────────────
         Transform.translate(
           offset: const Offset(0, -10),
           child: Row(children: [
-            _StatPill('1,234', 'Users',   _kCyan),
+            _StatPill(_fmt(users?['total']),  'Users',   _kCyan),
             _VDivider(),
-            _StatPill('45',    'Agents',  _kPurple),
+            _StatPill(_fmt(agents?['active']), 'Agents', _kPurple),
             _VDivider(),
-            _StatPill('28',    'Hosts',   _kPink),
+            _StatPill(_fmt(hosts?['active']),  'Hosts',  _kPink),
             _VDivider(),
-            _StatPill('98K 🪙', 'Volume', AppColors.gold),
+            _StatPill('🪙 ${_fmt(gifts?['volume'])}', 'Volume', AppColors.gold),
           ]),
         ),
+
         const SizedBox(height: 4),
-        // Action buttons
+
+        // ── Action buttons ────────────────────────────────────────────
         Row(children: [
-          Expanded(child: _OutlineBtn('💎 Buy Jewels', _kCyan,   onPayment)),
+          Expanded(child: _OutlineBtn('💎 Buy Jewels', _kCyan,  onPayment)),
           const SizedBox(width: 10),
-          Expanded(child: _OutlineBtn('👥 Sub-Agency', _kPink,   onSubAgency)),
+          Expanded(child: _OutlineBtn('👥 Sub-Agency', _kPink, onSubAgency)),
         ]),
       ]),
     );
@@ -585,7 +609,7 @@ class _PillTabDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext ctx, double shrinkOffset, bool overlaps) =>
       Container(
-        color: Colors.white,
+        color: AppColors.background,
         child: _PillTabRow(labels: labels, controller: controller),
       );
 
@@ -635,12 +659,10 @@ class _PillTabRowState extends State<_PillTabRow> {
                 gradient: active
                     ? const LinearGradient(colors: [_kPurple, _kPink])
                     : null,
-                color: active ? null : const Color(0xFFF7F7FB),
+                color: active ? null : AppColors.surfaceHigh,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: active
-                      ? Colors.transparent
-                      : const Color(0xFFEEEEF5),
+                  color: active ? Colors.transparent : AppColors.border,
                 ),
                 boxShadow: active ? [BoxShadow(
                   color: _kPurple.withValues(alpha: 0.4),
@@ -648,7 +670,7 @@ class _PillTabRowState extends State<_PillTabRow> {
                 )] : null,
               ),
               child: Text(widget.labels[i], style: AppTypography.labelSmall.copyWith(
-                color: active ? Colors.white : const Color(0xFF6B7280),
+                color: active ? Colors.white : AppColors.textSecondary,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w500,
               )),
             ),

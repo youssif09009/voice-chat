@@ -1,16 +1,8 @@
-
 import 'package:flutter/material.dart';
 import '../../../core/app_colors.dart';
 import '../../../core/app_typography.dart';
 import '../../../services/agency_api.dart';
 import '../widgets/agency_widgets.dart';
-
-const _kPurple = AppColors.primaryPurple;
-const _kPink   = Color(0xFFD946EF);
-const _kCyan   = Color(0xFF06B6D4);
-const _kText   = Color(0xFF1A1A2E);
-const _kSub    = Color(0xFF888899);
-const _kBorder = Color(0xFFEEEEF5);
 
 class EarningsTab extends StatefulWidget {
   const EarningsTab({super.key});
@@ -30,8 +22,10 @@ class _EarningsTabState extends State<EarningsTab> {
     setState(() { _loading = true; _error = null; });
     final r = await AgencyApi.instance.getEarningsBreakdown();
     if (!mounted) return;
-    setState(() { _loading = false;
-      if (r.ok) _d = r.data; else _error = r.error; });
+    setState(() {
+      _loading = false;
+      if (r.ok) _d = r.data; else _error = r.error;
+    });
   }
 
   @override
@@ -53,7 +47,9 @@ class _EarningsTabState extends State<EarningsTab> {
     final grand = hostTotal + agentTotal;
 
     return RefreshIndicator(
-      onRefresh: _load, color: _kPurple, backgroundColor: AppColors.background,
+      onRefresh: _load,
+      color: AppColors.primaryPurple,
+      backgroundColor: AppColors.surface,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -66,12 +62,11 @@ class _EarningsTabState extends State<EarningsTab> {
             const SizedBox(height: 16),
           ],
           SectionHeader(title: '🎙 Top Hosts — $period'),
-          ..._buildLeaderboard(topHosts, 'monthly_earnings', 'earned',
-              'hours', 'room time'),
+          ..._buildLeaderboard(topHosts, 'monthly_earnings', 'earned', 'hours', 'room time'),
           const SizedBox(height: 16),
           SectionHeader(title: '🤝 Top Agents — $period'),
-          ..._buildLeaderboard(topAgents, 'monthly_earnings', 'earned',
-              'total_invites', 'invites'),
+          ..._buildLeaderboard(topAgents, 'monthly_earnings', 'earned', 'total_invites', 'invites'),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -93,13 +88,16 @@ class _EarningsTabState extends State<EarningsTab> {
   }
 }
 
+// ── Grand total banner ────────────────────────────────────────────────────────
+
 class _GrandTotal extends StatelessWidget {
   final double value;
   const _GrandTotal({required this.value});
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF7C3AED), Color(0xFFD946EF)],
@@ -108,37 +106,47 @@ class _GrandTotal extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(children: [
-        const Text('💰', style: TextStyle(fontSize: 30)),
-        const SizedBox(width: 14),
+        Container(
+          width: 48, height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Center(child: Text('💰', style: TextStyle(fontSize: 24))),
+        ),
+        const SizedBox(width: 16),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Total Platform Earnings',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.75),
-                  fontSize: 12)),
-          Text('🪙 ${value.toStringAsFixed(2)} coins',
-              style: const TextStyle(color: Colors.white,
-                  fontSize: 20, fontWeight: FontWeight.bold)),
+              style: AppTypography.caption.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8))),
+          const SizedBox(height: 4),
+          Text('🪙 ${value.toStringAsFixed(0)} coins',
+              style: AppTypography.h1.copyWith(color: Colors.white)),
         ]),
       ]),
     );
   }
 }
 
+// ── Split row ─────────────────────────────────────────────────────────────────
+
 class _SplitRow extends StatelessWidget {
   final double hostTotal, agentTotal, grand;
   const _SplitRow({required this.hostTotal, required this.agentTotal,
       required this.grand});
+
   @override
   Widget build(BuildContext context) {
     final hPct = grand > 0 ? (hostTotal  / grand * 100).round() : 0;
     final aPct = grand > 0 ? (agentTotal / grand * 100).round() : 0;
     return Row(children: [
-      Expanded(child: _SplitCard(label: 'Host Commissions',
-          value: hostTotal, color: _kPink,
-          icon: Icons.mic_rounded, pct: hPct)),
+      Expanded(child: _SplitCard(
+          label: 'Host Commissions', value: hostTotal,
+          color: AppColors.pink, icon: Icons.mic_rounded, pct: hPct)),
       const SizedBox(width: 12),
-      Expanded(child: _SplitCard(label: 'Agent Commissions',
-          value: agentTotal, color: _kCyan,
-          icon: Icons.handshake_rounded, pct: aPct)),
+      Expanded(child: _SplitCard(
+          label: 'Agent Commissions', value: agentTotal,
+          color: AppColors.cyan, icon: Icons.handshake_rounded, pct: aPct)),
     ]);
   }
 }
@@ -151,30 +159,36 @@ class _SplitCard extends StatelessWidget {
   final int pct;
   const _SplitCard({required this.label, required this.value,
       required this.color, required this.icon, required this.pct});
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6, offset: const Offset(0, 2))],
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(icon, color: color, size: 15),
-          const SizedBox(width: 6),
-          Expanded(child: Text(label,
-              style: const TextStyle(color: _kSub, fontSize: 11))),
-          Text('$pct%', style: TextStyle(color: color,
-              fontSize: 11, fontWeight: FontWeight.bold)),
+          Container(
+            width: 30, height: 30,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 15),
+          ),
+          const Spacer(),
+          Text('$pct%', style: AppTypography.labelSmall.copyWith(
+              color: color, fontWeight: FontWeight.w700)),
         ]),
+        const SizedBox(height: 10),
+        Text(label, style: AppTypography.caption),
+        const SizedBox(height: 4),
+        Text('🪙 ${value.toStringAsFixed(0)}',
+            style: AppTypography.labelLarge.copyWith(color: color)),
         const SizedBox(height: 8),
-        Text('🪙 ${value.toStringAsFixed(0)}', style: TextStyle(
-            color: color, fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
@@ -188,22 +202,24 @@ class _SplitCard extends StatelessWidget {
   }
 }
 
+// ── Daily chart ───────────────────────────────────────────────────────────────
+
 class _DailyChart extends StatelessWidget {
   final List<Map<String, dynamic>> daily;
   const _DailyChart({required this.daily});
+
   @override
   Widget build(BuildContext context) {
     final maxVal = daily.fold<double>(0, (m, r) =>
         ((r['host_earnings'] as num) + (r['agent_earnings'] as num))
             .toDouble().clamp(m, double.infinity));
+
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: Column(children: daily.map((row) {
         final total = (row['host_earnings'] as num).toDouble() +
@@ -212,20 +228,20 @@ class _DailyChart extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(children: [
-            SizedBox(width: 72, child: Text(row['day'] as String,
-                style: const TextStyle(color: _kSub, fontSize: 11))),
+            SizedBox(width: 76,
+                child: Text(row['day'] as String, style: AppTypography.caption)),
             Expanded(child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: barW.toDouble(), minHeight: 10,
                 backgroundColor: AppColors.border,
-                valueColor: const AlwaysStoppedAnimation(_kPurple),
+                valueColor: const AlwaysStoppedAnimation(AppColors.primaryPurple),
               ),
             )),
             const SizedBox(width: 10),
             Text('🪙${total.toStringAsFixed(0)}',
-                style: const TextStyle(color: _kText,
-                    fontSize: 12, fontWeight: FontWeight.bold)),
+                style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
           ]),
         );
       }).toList()),
