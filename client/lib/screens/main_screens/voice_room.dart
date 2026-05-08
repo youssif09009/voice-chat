@@ -319,8 +319,8 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      // Chat area — panel buttons auto-size to fit via LayoutBuilder
-                      const double chatHeight = 175;
+                      // chatHeight must fit 3 panel buttons (min ~40px each + padding)
+                      const double chatHeight = 155;
                       final double gridHeight =
                           constraints.maxHeight - chatHeight;
                       return Column(
@@ -621,7 +621,7 @@ class _Pill extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Right Side Panel — 3 premium image buttons, in the chat row
+// Right Side Panel — 3 premium image buttons, perfectly centered
 // ---------------------------------------------------------------------------
 
 class _RightSidePanel extends StatelessWidget {
@@ -630,31 +630,26 @@ class _RightSidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 80,
+      width: 76,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Each button gets 1/3 of available height minus padding
-          final double btnSize =
-              ((constraints.maxHeight - 20) / 3).clamp(48.0, 70.0);
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _ImagePanelBtn(
+          final double h = constraints.maxHeight;
+          // Each button = 1/3 of height minus 20px total padding
+          final double btnSize = ((h - 20) / 3).clamp(36.0, 64.0);
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _PanelBtn(
                   assetPath: 'assets/images/panel_icon_1.png',
-                  size: btnSize,
-                ),
-                _ImagePanelBtn(
+                  size: btnSize),
+              _PanelBtn(
                   assetPath: 'assets/images/panel_icon_2.png',
-                  size: btnSize,
-                ),
-                _ImagePanelBtn(
+                  size: btnSize),
+              _PanelBtn(
                   assetPath: 'assets/images/panel_icon_3.png',
-                  size: btnSize,
-                ),
-              ],
-            ),
+                  size: btnSize),
+            ],
           );
         },
       ),
@@ -662,7 +657,111 @@ class _RightSidePanel extends StatelessWidget {
   }
 }
 
-/// Paints a rounded-rectangle gradient border around its child.
+/// Premium panel button:
+/// - Transparent background (room bg shows through)
+/// - Gold→purple→cyan gradient border via CustomPainter
+/// - Image centered inside, top-aligned to avoid watermark
+/// - Dark gradient overlay on bottom half hides any watermark text
+class _PanelBtn extends StatelessWidget {
+  final String assetPath;
+  final double size;
+
+  const _PanelBtn({required this.assetPath, required this.size});
+
+  static const double _r = 13.0; // border radius
+  static const double _bw = 2.5; // border width
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {},
+      child: Center(
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: CustomPaint(
+            // Draws the gradient border ring
+            painter: _GradientBorderPainter(
+              borderWidth: _bw,
+              radius: _r,
+              gradient: const SweepGradient(
+                colors: [
+                  Color(0xFFFFD700), // gold
+                  Color(0xFF8B5CF6), // purple
+                  Color(0xFF06B6D4), // cyan
+                  Color(0xFFFFD700), // back to gold
+                ],
+                stops: [0.0, 0.33, 0.66, 1.0],
+              ),
+            ),
+            // Foreground: transparent bg + image + watermark cover
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(_r - _bw),
+              child: Stack(
+                clipBehavior: Clip.hardEdge,
+                fit: StackFit.expand,
+                children: [
+                  // Transparent dark bg — room background shows through
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(_r - _bw),
+                    ),
+                  ),
+                  // Image — top-aligned so main content shows
+                  Image.asset(
+                    assetPath,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    cacheWidth: 120,
+                    frameBuilder:
+                        (context, child, frame, wasSynchronouslyLoaded) {
+                      if (wasSynchronouslyLoaded || frame != null) {
+                        return child;
+                      }
+                      // Shimmer while loading
+                      return Container(
+                        color: Colors.white.withValues(alpha: 0.04),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Icon(
+                        Icons.image_rounded,
+                        color: Colors.white.withValues(alpha: 0.3),
+                        size: size * 0.38,
+                      ),
+                    ),
+                  ),
+                  // Dark gradient on bottom — covers watermark text
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: size * 0.42,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.9),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Paints a rounded-rectangle gradient border ring.
 class _GradientBorderPainter extends CustomPainter {
   final Gradient gradient;
   final double borderWidth;
@@ -677,27 +776,20 @@ class _GradientBorderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
-
-    // Outer path
-    final outerPath = Path()..addRRect(rrect);
-
-    // Inner path (shrunk by borderWidth)
-    final innerRRect = RRect.fromRectAndRadius(
-      rect.deflate(borderWidth),
-      Radius.circular(radius - borderWidth),
+    final outer = Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+    final inner = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        rect.deflate(borderWidth),
+        Radius.circular(radius - borderWidth),
+      ));
+    final ring = Path.combine(PathOperation.difference, outer, inner);
+    canvas.drawPath(
+      ring,
+      Paint()
+        ..shader = gradient.createShader(rect)
+        ..style = PaintingStyle.fill,
     );
-    final innerPath = Path()..addRRect(innerRRect);
-
-    // Clip to the border ring only
-    final borderPath =
-        Path.combine(PathOperation.difference, outerPath, innerPath);
-
-    final paint = Paint()
-      ..shader = gradient.createShader(rect)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawPath(borderPath, paint);
   }
 
   @override
@@ -705,143 +797,6 @@ class _GradientBorderPainter extends CustomPainter {
       old.gradient != gradient ||
       old.borderWidth != borderWidth ||
       old.radius != radius;
-}
-
-/// Premium image panel button with a real gradient border
-class _ImagePanelBtn extends StatelessWidget {
-  final String assetPath;
-  final double size;
-
-  const _ImagePanelBtn({
-    required this.assetPath,
-    this.size = 58,
-  });
-
-  static const double _radius = 14;
-  static const double _borderW = 3.5; // thick visible border
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {},
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: CustomPaint(
-          painter: _GradientBorderPainter(
-            borderWidth: _borderW,
-            radius: _radius,
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xFFFFD700), // gold
-                Color(0xFFFF00FF), // magenta
-                Color(0xFF00BFFF), // deep sky blue
-                Color(0xFFFFD700), // gold again — loops
-              ],
-              stops: [0.0, 0.33, 0.66, 1.0],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(_radius),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  spreadRadius: 1,
-                ),
-                BoxShadow(
-                  color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
-                  blurRadius: 14,
-                  spreadRadius: 2,
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_radius - _borderW),
-              child: Stack(
-                clipBehavior: Clip.hardEdge,
-                children: [
-                  // Image — top-aligned to show clean content
-                  Image.asset(
-                    assetPath,
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
-                    cacheWidth: 116,
-                    frameBuilder:
-                        (context, child, frame, wasSynchronouslyLoaded) {
-                      if (wasSynchronouslyLoaded || frame != null) return child;
-                      return Container(
-                        width: size,
-                        height: size,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.white.withValues(alpha: 0.06),
-                              Colors.white.withValues(alpha: 0.10),
-                              Colors.white.withValues(alpha: 0.06),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF1A0A30),
-                            const Color(0xFF0A0518),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: Icon(Icons.image_rounded,
-                          color: Colors.white24, size: size * 0.4),
-                    ),
-                  ),
-                  // Dark gradient covers bottom — hides any watermark
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: size * 0.5,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.8),
-                            Colors.black,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1030,20 +985,19 @@ class _SlotsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const int cols = 4;
-    const int rows = 5; // 4×5 = 20 slots
+    const int cols = 5; // 5 cols × 4 rows = 20 slots, wider cells
+    const int rows = 4;
     const int total = cols * rows;
 
     final double screenW = MediaQuery.of(context).size.width;
     final double cellW = screenW / cols;
     final double cellH = availableHeight / rows;
 
-    // Reserve 18px for the label text below the avatar
-    // avatarSize = remaining height, clamped to reasonable range
-    const double labelH = 18.0;
-    const double gap = 4.0;
+    const double labelH = 14.0;
+    const double gap = 3.0;
+    const double safety = 4.0;
     final double avatarSize =
-        (cellH - labelH - gap).clamp(32.0, 88.0);
+        (cellH - labelH - gap - safety).clamp(28.0, 999.0);
 
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
@@ -1104,28 +1058,41 @@ class _ParticipantSlot extends StatelessWidget {
             ? const Color(0xFF00E5FF)
             : AppColors.primaryPurple.withValues(alpha: 0.8);
 
-    final double innerSize = avatarSize - 4;
-    final double badgeSize = (avatarSize * 0.28).clamp(10.0, 18.0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double h = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : cellH;
+        // Avatar = 74% of cell height — no upper clamp, grows with cell
+        final double sz = (h * 0.74).clamp(26.0, 999.0);
+        final double inner = sz - 4;
+        final double badge = (sz * 0.28).clamp(9.0, 17.0);
+        // Label sits at the bottom of the cell
+        const double labelH = 14.0;
+        final double avatarTop = (h - sz - labelH - 2) / 2;
 
-    // Use SizedBox with exact cellH — zero overflow guaranteed
-    return SizedBox(
-      height: cellH,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Avatar stack — clipped to avatarSize × avatarSize
-          SizedBox(
-            width: avatarSize,
-            height: avatarSize,
-            child: Stack(
-              clipBehavior: Clip.hardEdge,
-              alignment: Alignment.center,
-              children: [
+        return SizedBox(
+          height: h,
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              // Avatar — positioned from top
+              Positioned(
+                top: avatarTop.clamp(0.0, h - sz),
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: SizedBox(
+                    width: sz,
+                    height: sz,
+                    child: Stack(
+                      clipBehavior: Clip.hardEdge,
+                      alignment: Alignment.center,
+                      children: [
                 // Ring with glow
                 Container(
-                  width: avatarSize,
-                  height: avatarSize,
+                  width: sz,
+                  height: sz,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -1145,8 +1112,8 @@ class _ParticipantSlot extends StatelessWidget {
                 ),
                 // Avatar fill
                 Container(
-                  width: innerSize,
-                  height: innerSize,
+                  width: inner,
+                  height: inner,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
@@ -1184,7 +1151,7 @@ class _ParticipantSlot extends StatelessWidget {
                         : isMe
                             ? const Color(0xFF00E5FF)
                             : AppColors.accentPurple,
-                    size: innerSize * 0.46,
+                    size: inner * 0.46,
                   ),
                 ),
                 // Crown — top of avatar, inside bounds
@@ -1193,7 +1160,7 @@ class _ParticipantSlot extends StatelessWidget {
                     top: 0,
                     child: Text('👑',
                         style: TextStyle(
-                          fontSize: avatarSize * 0.22,
+                          fontSize: sz * 0.22,
                           shadows: const [
                             Shadow(color: Colors.black, blurRadius: 4)
                           ],
@@ -1241,8 +1208,8 @@ class _ParticipantSlot extends StatelessWidget {
                     bottom: 0,
                     right: 0,
                     child: Container(
-                      width: badgeSize,
-                      height: badgeSize,
+                      width: badge,
+                      height: badge,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFFD32F2F), Color(0xFFFF1744)],
@@ -1253,7 +1220,7 @@ class _ParticipantSlot extends StatelessWidget {
                             width: 1.5),
                       ),
                       child: Icon(Icons.mic_off,
-                          color: Colors.white, size: badgeSize * 0.55),
+                          color: Colors.white, size: badge * 0.55),
                     ),
                   ),
                 // Bot badge — top right
@@ -1262,8 +1229,8 @@ class _ParticipantSlot extends StatelessWidget {
                     top: 0,
                     right: 0,
                     child: Container(
-                      width: badgeSize * 0.9,
-                      height: badgeSize * 0.9,
+                      width: badge * 0.9,
+                      height: badge * 0.9,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFF1B5E20), Color(0xFF4CAF50)],
@@ -1271,7 +1238,7 @@ class _ParticipantSlot extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.smart_toy,
-                          color: Colors.white, size: badgeSize * 0.5),
+                          color: Colors.white, size: badge * 0.5),
                     ),
                   ),
                 // Host-view tap hint
@@ -1290,33 +1257,43 @@ class _ParticipantSlot extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          SelectionContainer.disabled(
-            child: Text(
-              isMe ? 'You' : participant.username,
-              style: TextStyle(
-                color: participant.isHost
-                    ? AppColors.gold
-                    : participant.isBot
-                        ? Colors.greenAccent.shade400
-                        : isMe
-                            ? const Color(0xFF00E5FF)
-                            : Colors.white,
-                fontSize: 10,
-                fontWeight: participant.isHost || isMe
-                    ? FontWeight.bold
-                    : FontWeight.w500,
-                shadows: const [
-                  Shadow(color: Colors.black, blurRadius: 6),
-                ],
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
+              // Label — pinned to bottom of cell
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: labelH,
+                child: SelectionContainer.disabled(
+                  child: Text(
+                    isMe ? 'You' : participant.username,
+                    style: TextStyle(
+                      color: participant.isHost
+                          ? AppColors.gold
+                          : participant.isBot
+                              ? Colors.greenAccent.shade400
+                              : isMe
+                                  ? const Color(0xFF00E5FF)
+                                  : Colors.white,
+                      fontSize: 9,
+                      fontWeight: participant.isHost || isMe
+                          ? FontWeight.bold
+                          : FontWeight.w500,
+                      shadows: const [
+                        Shadow(color: Colors.black, blurRadius: 6),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1334,42 +1311,59 @@ class _EmptySlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return ClipRect(
+      child: SizedBox(
       height: cellH,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
         children: [
-          Container(
-            width: avatarSize,
-            height: avatarSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  Colors.white.withValues(alpha: 0.04),
-                  Colors.transparent,
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.14),
-                width: 1,
+          // Circle — centered
+          Positioned(
+            top: 0,
+            bottom: 14,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: avatarSize,
+                height: avatarSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.04),
+                      Colors.transparent,
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    width: 1,
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '$number',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.35),
-              fontSize: 10,
-              fontWeight: FontWeight.w400,
-              shadows: const [
-                Shadow(color: Colors.black, blurRadius: 4)
-              ],
+          // Number label — pinned to bottom
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 14,
+            child: Text(
+              '$number',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                fontSize: 9,
+                fontWeight: FontWeight.w400,
+                shadows: const [
+                  Shadow(color: Colors.black, blurRadius: 4)
+                ],
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
         ],
+      ),
       ),
     );
   }

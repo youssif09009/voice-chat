@@ -6,6 +6,20 @@ const cors = require('cors');
 const { getAllRooms, serializeRoom, getRoom, createRoom } = require('./src/rooms');
 const { registerSignaling } = require('./src/signaling');
 
+// Agency & Hosts System routes
+require('./src/db'); // initialise DB + seed admin on startup
+const usersRouter       = require('./src/routes/users');
+const agentsRouter      = require('./src/routes/agents');
+const hostsRouter       = require('./src/routes/hosts');
+const giftsRouter       = require('./src/routes/gifts');
+const rankingsRouter    = require('./src/routes/rankings');
+const adminRouter       = require('./src/routes/admin');
+// Extended agency modules
+const agencyTypesRouter = require('./src/routes/agency_types');
+const financialRouter   = require('./src/routes/financial');
+const hierarchyRouter   = require('./src/routes/hierarchy');
+const rechargeRouter    = require('./src/routes/recharge');
+
 const PORT = process.env.PORT || 3000;
 
 // ---------------------------------------------------------------------------
@@ -21,7 +35,21 @@ const io = new Server(server, {
 });
 
 // ---------------------------------------------------------------------------
-// REST endpoints
+// Agency & Hosts System API
+// ---------------------------------------------------------------------------
+app.use('/api/users',           usersRouter);
+app.use('/api/agents',          agentsRouter);
+app.use('/api/hosts',           hostsRouter);
+app.use('/api/gifts',           giftsRouter);
+app.use('/api/rankings',        rankingsRouter);
+app.use('/api/admin',           adminRouter);
+app.use('/api/agency-types',    agencyTypesRouter);
+app.use('/api/financial',       financialRouter);
+app.use('/api/hierarchy',       hierarchyRouter);
+app.use('/api/recharge',        rechargeRouter);
+
+// ---------------------------------------------------------------------------
+// REST endpoints (existing voice room API)
 // ---------------------------------------------------------------------------
 
 /** GET /rooms — list all live rooms */
