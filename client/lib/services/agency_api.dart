@@ -204,6 +204,9 @@ class AgencyApi {
   Future<ApiResult<Map<String, dynamic>>> getEarningsBreakdown() =>
       _get('/api/admin/earnings-breakdown');
 
+  Future<ApiResult<Map<String, dynamic>>> createAgent(String email) =>
+      _post('/api/admin/agents/create', {'email': email});
+
   // -------------------------------------------------------------------------
   // Agents
   // -------------------------------------------------------------------------
